@@ -1,22 +1,26 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "shell.h"
 
 int main() {
-    char* cmdline;
-    char** arglist;
+    char *line;
+    char **arglist;
 
-    while ((cmdline = read_cmd(PROMPT, stdin)) != NULL) {
-        if ((arglist = tokenize(cmdline)) != NULL) {
-            execute(arglist);
+    while (1) {
+        printf("FCIT> ");
+        fflush(stdout);
 
-            // Free the memory allocated by tokenize()
-            for (int i = 0; arglist[i] != NULL; i++) {
-                free(arglist[i]);
-            }
-            free(arglist);
+        line = read_line();
+        arglist = split_line(line);
+
+        // check built-in commands first
+        if (!handle_builtin(arglist)) {
+            execute(arglist); // run external command if not built-in
         }
-        free(cmdline);
+
+        free(line);
+        free(arglist);
     }
 
-    printf("\nShell exited.\n");
     return 0;
 }

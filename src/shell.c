@@ -1,62 +1,64 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include "shell.h"
 
-char* read_cmd(char* prompt, FILE* fp) {
-    printf("%s", prompt);
-    char* cmdline = (char*) malloc(sizeof(char) * MAX_LEN);
-    int c, pos = 0;
+int handle_builtin(char **arglist) {
+    if (arglist[0] == NULL) return 0; // no command entered
 
-    while ((c = getc(fp)) != EOF) {
-        if (c == '\n') break;
-        cmdline[pos++] = c;
+    if (strcmp(arglist[0], "exit") == 0) {
+        printf("Exiting shell...\n");
+        exit(0);
+    }
+    else if (strcmp(arglist[0], "cd") == 0) {
+        if (arglist[1] == NULL) {
+            fprintf(stderr, "cd: missing argument\n");
+        } else {
+            if (chdir(arglist[1]) != 0) {
+                perror("cd");
+            }
+        }
+        return 1; // handled
+    }
+    else if (strcmp(arglist[0], "help") == 0) {
+        printf("Built-in commands:\n");
+        printf("  exit     - terminate the shell\n");
+        printf("  cd DIR   - change directory to DIR\n");
+        printf("  help     - show this message\n");
+        printf("  jobs     - list background jobs (not yet implemented)\n");
+        return 1; // handled
+    }
+    else if (strcmp(arglist[0], "jobs") == 0) {
+        printf("Job control not yet implemented.\n");
+        return 1; // handled
     }
 
-    if (c == EOF && pos == 0) {
-        free(cmdline);
-        return NULL; // Handle Ctrl+D
+    return 0; // not a built-in
+}
+#define MAX_LINE 1024
+#define MAX_ARGS 64
+
+char *read_line() {
+    char *line = malloc(MAX_LINE);
+    if (!line) { perror("malloc"); exit(1); }
+    if (fgets(line, MAX_LINE, stdin) == NULL) {
+        printf("\n"); // handle Ctrl+D
+        exit(0);
     }
-    
-    cmdline[pos] = '\0';
-    return cmdline;
+    line[strcspn(line, "\n")] = 0; // remove newline
+    return line;
 }
 
-char** tokenize(char* cmdline) {
-    // Edge case: empty command line
-    if (cmdline == NULL || cmdline[0] == '\0' || cmdline[0] == '\n') {
-        return NULL;
+char **split_line(char *line) {
+    char **args = malloc(MAX_ARGS * sizeof(char *));
+    char *token;
+    int i = 0;
+    token = strtok(line, " ");
+    while (token != NULL && i < MAX_ARGS-1) {
+        args[i++] = token;
+        token = strtok(NULL, " ");
     }
-
-    char** arglist = (char**)malloc(sizeof(char*) * (MAXARGS + 1));
-    for (int i = 0; i < MAXARGS + 1; i++) {
-        arglist[i] = (char*)malloc(sizeof(char) * ARGLEN);
-        bzero(arglist[i], ARGLEN);
-    }
-
-    char* cp = cmdline;
-    char* start;
-    int len;
-    int argnum = 0;
-
-    while (*cp != '\0' && argnum < MAXARGS) {
-        while (*cp == ' ' || *cp == '\t') cp++; // Skip leading whitespace
-        
-        if (*cp == '\0') break; // Line was only whitespace
-
-        start = cp;
-        len = 1;
-        while (*++cp != '\0' && !(*cp == ' ' || *cp == '\t')) {
-            len++;
-        }
-        strncpy(arglist[argnum], start, len);
-        arglist[argnum][len] = '\0';
-        argnum++;
-    }
-
-    if (argnum == 0) { // No arguments were parsed
-        for(int i = 0; i < MAXARGS + 1; i++) free(arglist[i]);
-        free(arglist);
-        return NULL;
-    }
-
-    arglist[argnum] = NULL;
-    return arglist;
+    args[i] = NULL;
+    return args;
 }
